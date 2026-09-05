@@ -1,41 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { generatePlan } from "@/lib/planGenerator";
+import type { Plan } from "@/lib/planGenerator";
+import type { Diet, Goal, IntakeData, Sex, Split } from "@/types/intake";
 
-type Sex = "male" | "female" | "prefer-not-to-say" | "";
 // TODO: When plan assembly is added, keep an Aesthetics secondary goal modest when Conditioning is primary.
-type Goal = "strength" | "aesthetics" | "weight-loss" | "conditioning" | "athleticism" | "general" | "";
-type Split = "full-body" | "upper-lower" | "push-pull-legs" | "body-part-split" | "athletic-hybrid" | "";
-type Diet = "none" | "vegetarian" | "protein-prioritization" | "carbohydrate-prioritization" | "other" | "";
-
-type SportHistory = { name: string; years: number | null };
-
-interface IntakeData {
-  name: string;
-  age: number | null;
-  sex: Sex;
-  heightFt: number | null;
-  heightIn: number | null;
-  weight: number | null;
-  highSchoolSports: SportHistory[];
-  otherSport: string;
-  favoriteActivities: string[];
-  favoriteActivityOther: string;
-  primaryGoal: Goal;
-  primaryAestheticsAreas: string[];
-  secondaryGoal: Goal;
-  secondaryAestheticsAreas: string[];
-  daysPerWeek: number | null;
-  hoursPerDay: number | null;
-  trainingSplit: Split;
-  trainingMethods: string[];
-  sportSkillSports: string[];
-  sportSkillOther: string;
-  trainingRestrictions: string;
-  dietPlan: Diet;
-  dietPlanOther: string;
-  dietaryRestrictions: string;
-}
 
 const INITIAL_DATA: IntakeData = {
   name: "", age: null, sex: "", heightFt: null, heightIn: null, weight: null,
@@ -76,6 +46,7 @@ const list = (items: string[]) => items.length ? items.join(", ") : "None";
 export default function GetStartedPage() {
   const [step, setStep] = useState(0);
   const [data, setData] = useState<IntakeData>(INITIAL_DATA);
+  const [plan, setPlan] = useState<Plan | null>(null);
   const update = <K extends keyof IntakeData>(field: K, value: IntakeData[K]) => setData((previous) => ({ ...previous, [field]: value }));
   const toggleSkillSport = (sport: string) => update("sportSkillSports", data.sportSkillSports.includes(sport) ? data.sportSkillSports.filter((current) => current !== sport) : data.sportSkillSports.length < 2 ? [...data.sportSkillSports, sport] : data.sportSkillSports);
   const selectedSport = (name: string) => data.highSchoolSports.find((sport) => sport.name === name);
@@ -95,7 +66,7 @@ export default function GetStartedPage() {
   };
   const next = () => { if (step < STEPS.length - 1 && valid()) setStep(step + 1); };
   const back = () => { if (step > 0) setStep(step - 1); };
-  const submit = () => { console.log("Intake form data:", data); alert("Form submitted! Check the console for your data."); };
+  const submit = () => setPlan(generatePlan(data));
   const input = "w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-base outline-none transition-colors focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900/10 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400";
   const label = "block text-sm font-medium mb-1.5";
   const card = (active: boolean) => `flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all ${active ? "border-zinc-900 bg-zinc-900/5 ring-2 ring-zinc-900/10 dark:border-zinc-400 dark:bg-zinc-400/10" : "border-zinc-200 bg-white hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900"}`;
@@ -111,7 +82,7 @@ export default function GetStartedPage() {
     return <div className="space-y-4"><Review title="Biometrics" edit={() => setStep(0)} items={[["Name", data.name], ["Age", `${data.age ?? "—"}`], ["Sex", data.sex || "—"], ["Height", data.heightFt === null || data.heightIn === null ? "—" : `${data.heightFt}'${data.heightIn}"`], ["Weight", data.weight === null ? "—" : `${data.weight} lbs`]]} /><Review title="Athletic History" edit={() => setStep(1)} items={[["HS sports", data.highSchoolSports.map((sport) => `${sport.name === "Other" ? data.otherSport || "Other" : sport.name} (${sport.years ?? "?"} yr)`).join(", ") || "None"], ["Favorite activities", data.favoriteActivities.map((activity) => activity === "Other" ? data.favoriteActivityOther || "Other" : activity).join(", ") || "None"]]} /><Review title="Goals" edit={() => setStep(2)} items={[["Primary", GOALS.find((goal) => goal.value === data.primaryGoal)?.label || "—"], ["Primary aesthetics", list(data.primaryAestheticsAreas)], ["Secondary", GOALS.find((goal) => goal.value === data.secondaryGoal)?.label || "None"], ["Secondary aesthetics", list(data.secondaryAestheticsAreas)], ["Availability", `${data.daysPerWeek ?? "—"} days / ${data.hoursPerDay ?? "—"} hours`]]} /><Review title="Preferences" edit={() => setStep(3)} items={[["Split", SPLITS.find((split) => split.value === data.trainingSplit)?.label || "—"], ["Methods", list(data.trainingMethods)], ["Skill sports", list(data.sportSkillSports.map((sport) => sport === "Other" ? data.sportSkillOther || "Other" : sport))], ["Restrictions", data.trainingRestrictions || "None"]]} /><Review title="Diet" edit={() => setStep(4)} items={[["Plan", DIETS.find((diet) => diet.value === data.dietPlan)?.label || "—"], ["Other plan", data.dietPlanOther || "None"], ["Restrictions / allergies", data.dietaryRestrictions || "None"]]} /></div>;
   };
 
-  return <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black"><main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 py-8 sm:px-6"><div className="mb-2 text-center"><h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Let&apos;s Get You Started</h1><p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Tell us about your background so we can build your plan.</p></div><div className="mb-8 mt-6"><div className="flex items-center justify-between">{STEPS.map((current, index) => <div key={current.title} className="flex flex-1 items-center"><button type="button" onClick={() => index <= step && setStep(index)} className="flex flex-col items-center" aria-label={`Go to ${current.title}`}><span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${index < step ? "bg-zinc-900 text-white" : index === step ? "bg-zinc-900 text-white ring-2 ring-zinc-900/20 ring-offset-2" : "bg-zinc-200 text-zinc-500"}`}>{index < step ? "✓" : index + 1}</span><span className="mt-1 hidden text-[10px] font-medium text-zinc-500 sm:block">{current.title}</span></button>{index < STEPS.length - 1 ? <div className={`mx-1 h-0.5 flex-1 ${index < step ? "bg-zinc-900" : "bg-zinc-200"}`} /> : null}</div>)}</div></div><div className="flex-1"><h2 className="mb-1 text-lg font-semibold text-zinc-900 dark:text-zinc-50">{STEPS[step].title}</h2><p className="mb-5 text-sm text-zinc-500 dark:text-zinc-400">{STEPS[step].description}</p>{renderStep()}</div><div className="mt-8 flex gap-3 border-t border-zinc-200 pt-5 dark:border-zinc-800">{step > 0 ? <button type="button" onClick={back} className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-medium text-zinc-700">Back</button> : null}{step < STEPS.length - 1 ? <button type="button" onClick={next} disabled={!valid()} className="flex-1 rounded-lg bg-zinc-900 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">Next</button> : <button type="button" onClick={submit} className="flex-1 rounded-lg bg-zinc-900 px-4 py-3 text-sm font-medium text-white">Submit</button>}</div></main></div>;
+  return <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black"><main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 py-8 sm:px-6"><div className="mb-2 text-center"><h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Let&apos;s Get You Started</h1><p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Tell us about your background so we can build your plan.</p></div><div className="mb-8 mt-6"><div className="flex items-center justify-between">{STEPS.map((current, index) => <div key={current.title} className="flex flex-1 items-center"><button type="button" onClick={() => index <= step && setStep(index)} className="flex flex-col items-center" aria-label={`Go to ${current.title}`}><span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${index < step ? "bg-zinc-900 text-white" : index === step ? "bg-zinc-900 text-white ring-2 ring-zinc-900/20 ring-offset-2" : "bg-zinc-200 text-zinc-500"}`}>{index < step ? "✓" : index + 1}</span><span className="mt-1 hidden text-[10px] font-medium text-zinc-500 sm:block">{current.title}</span></button>{index < STEPS.length - 1 ? <div className={`mx-1 h-0.5 flex-1 ${index < step ? "bg-zinc-900" : "bg-zinc-200"}`} /> : null}</div>)}</div></div><div className="flex-1"><h2 className="mb-1 text-lg font-semibold text-zinc-900 dark:text-zinc-50">{STEPS[step].title}</h2><p className="mb-5 text-sm text-zinc-500 dark:text-zinc-400">{STEPS[step].description}</p>{renderStep()}</div><div className="mt-8 flex gap-3 border-t border-zinc-200 pt-5 dark:border-zinc-800">{step > 0 ? <button type="button" onClick={back} className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-medium text-zinc-700">Back</button> : null}{step < STEPS.length - 1 ? <button type="button" onClick={next} disabled={!valid()} className="flex-1 rounded-lg bg-zinc-900 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">Next</button> : <button type="button" onClick={submit} className="flex-1 rounded-lg bg-zinc-900 px-4 py-3 text-sm font-medium text-white">Submit</button>}</div>{plan ? <pre className="mt-6 overflow-x-auto rounded-lg bg-zinc-900 p-4 text-xs leading-relaxed text-zinc-100">{JSON.stringify(plan, null, 2)}</pre> : null}</main></div>;
 }
 
 function Review({ title, edit, items }: { title: string; edit: () => void; items: [string, string][] }) {

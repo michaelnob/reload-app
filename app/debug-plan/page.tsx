@@ -1,37 +1,66 @@
 import { generatePlan } from "@/lib/planGenerator";
+import type { IntakeData } from "@/types/intake";
 
-const SAMPLES = [
+const BASE_INTAKE: IntakeData = {
+  name: "Debug Athlete",
+  age: 30,
+  sex: "prefer-not-to-say",
+  heightFt: 5,
+  heightIn: 10,
+  weight: 180,
+  highSchoolSports: [{ name: "Football", years: 4 }],
+  otherSport: "",
+  favoriteActivities: [],
+  favoriteActivityOther: "",
+  primaryGoal: "general",
+  primaryAestheticsAreas: [],
+  secondaryGoal: "",
+  secondaryAestheticsAreas: [],
+  daysPerWeek: 3,
+  hoursPerDay: 1,
+  trainingSplit: "full-body",
+  trainingMethods: [],
+  sportSkillSports: [],
+  sportSkillOther: "",
+  trainingRestrictions: "",
+  dietPlan: "none",
+  dietPlanOther: "",
+  dietaryRestrictions: "",
+};
+
+const SAMPLES: { name: string; intake: IntakeData }[] = [
   {
     name: "Strength / Full-Body / 3-day",
     intake: {
-      fitnessGoal: "strength" as const,
+      ...BASE_INTAKE,
+      primaryGoal: "strength",
       daysPerWeek: 3,
       trainingSplit: "full-body" as const,
       favoriteActivities: ["Weightlifting"],
-      favoriteActivityOther: "",
-      trainingMethods: ["Strength training"],
+      trainingMethods: ["Free weight training"],
     },
   },
   {
-    name: "Combat Sport / Sport-Specific / 5-day",
+    name: "Sport Skill / Athletic Hybrid / 5-day",
     intake: {
-      fitnessGoal: "conditioning" as const,
+      ...BASE_INTAKE,
+      primaryGoal: "conditioning",
       daysPerWeek: 5,
-      trainingSplit: "sport-specific" as const,
-      favoriteActivities: ["Wrestling", "Sprints"],
-      favoriteActivityOther: "",
-      trainingMethods: ["Combat sport", "Strength training"],
+      trainingSplit: "athletic-hybrid",
+      favoriteActivities: ["Sprinting"],
+      trainingMethods: ["Free weight training", "Sport-specific skill work"],
+      sportSkillSports: ["Wrestling"],
     },
   },
   {
-    name: "Hypertrophy / Push-Pull-Legs / 4-day",
+    name: "Aesthetics / Push-Pull-Legs / 4-day",
     intake: {
-      fitnessGoal: "hypertrophy" as const,
+      ...BASE_INTAKE,
+      primaryGoal: "aesthetics",
       daysPerWeek: 4,
       trainingSplit: "push-pull-legs" as const,
-      favoriteActivities: ["Conditioning / circuits"],
-      favoriteActivityOther: "",
-      trainingMethods: ["Cardio / endurance"],
+      favoriteActivities: ["Calisthenics"],
+      trainingMethods: ["Cardio"],
     },
   },
 ];

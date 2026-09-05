@@ -1,3 +1,5 @@
+import type { IntakeData } from "@/types/intake";
+
 export type GoalKey = "strength" | "hypertrophy" | "conditioning" | "general";
 
 export type SplitKey =
@@ -122,7 +124,7 @@ function resolve(name: string): string {
   return name.trim();
 }
 
-function conditionName(template: GoalTemplate, intake: Intake): string {
+function conditionName(template: GoalTemplate, intake: IntakeData): string {
   const method = intake.trainingMethods.find(
     (m) => METHOD_SLOT[m.toLowerCase()] === "conditioning"
   );
@@ -137,7 +139,7 @@ function conditionName(template: GoalTemplate, intake: Intake): string {
   return template.slots.conditioning[0] ?? FALLBACK;
 }
 
-function pickCompound(template: GoalTemplate, intake: Intake): string {
+function pickCompound(template: GoalTemplate, intake: IntakeData): string {
   if (
     intake.trainingMethods.some((m) => METHOD_SLOT[m.toLowerCase()] === "compound")
   ) {
@@ -196,7 +198,7 @@ function dayFromBlocks(index: number, focus: string, blocks: Block[]): Day {
   };
 }
 
-function planFullBody(days: number, template: GoalTemplate, intake: Intake): Day[] {
+function planFullBody(days: number, template: GoalTemplate, intake: IntakeData): Day[] {
   return Array.from({ length: days }, (_, i) => {
     const blocks: Block[] = [
       strengthBlock(template, pickCompound(template, intake)),
@@ -216,7 +218,7 @@ function planFullBody(days: number, template: GoalTemplate, intake: Intake): Day
   });
 }
 
-function planUpperLower(days: number, template: GoalTemplate, intake: Intake): Day[] {
+function planUpperLower(days: number, template: GoalTemplate, intake: IntakeData): Day[] {
   return Array.from({ length: days }, (_, i) => {
     const upper = i % 2 === 0;
     const blocks: Block[] = upper
@@ -235,7 +237,7 @@ function planUpperLower(days: number, template: GoalTemplate, intake: Intake): D
   });
 }
 
-function planPushPullLegs(days: number, template: GoalTemplate, intake: Intake): Day[] {
+function planPushPullLegs(days: number, template: GoalTemplate, intake: IntakeData): Day[] {
   const rotation: { focus: string; blocks: Block[] }[] = [
     {
       focus: "Push",
@@ -270,7 +272,7 @@ function planPushPullLegs(days: number, template: GoalTemplate, intake: Intake):
   });
 }
 
-function planSportSpecific(days: number, template: GoalTemplate, intake: Intake): Day[] {
+function planSportSpecific(days: number, template: GoalTemplate, intake: IntakeData): Day[] {
   return Array.from({ length: days }, (_, i) => {
     const isSkillDay = i % 2 === 1;
     const blocks: Block[] = [
@@ -286,18 +288,32 @@ function planSportSpecific(days: number, template: GoalTemplate, intake: Intake)
   });
 }
 
-type Intake = {
-  fitnessGoal: GoalKey | "";
-  daysPerWeek: number | null;
-  trainingSplit: SplitKey | "";
-  favoriteActivities: string[];
-  favoriteActivityOther: string;
-  trainingMethods: string[];
-};
+function resolveGoal(goal: IntakeData["primaryGoal"]): GoalKey {
+  switch (goal) {
+    case "strength":
+      return "strength";
+    case "conditioning":
+      return "conditioning";
+    default:
+      return "general";
+  }
+}
 
-export function generatePlan(intake: Intake): Plan {
-  const goal: GoalKey = intake.fitnessGoal === "" ? "general" : intake.fitnessGoal;
-  const split: SplitKey = intake.trainingSplit === "" ? "full-body" : intake.trainingSplit;
+function resolveSplit(split: IntakeData["trainingSplit"]): SplitKey {
+  switch (split) {
+    case "upper-lower":
+    case "push-pull-legs":
+      return split;
+    case "full-body":
+      return "full-body";
+    default:
+      return "full-body";
+  }
+}
+
+export function generatePlan(intake: IntakeData): Plan {
+  const goal = resolveGoal(intake.primaryGoal);
+  const split = resolveSplit(intake.trainingSplit);
   const days = intake.daysPerWeek === null || intake.daysPerWeek < 1 ? 3 : Math.min(intake.daysPerWeek, 7);
   const template = GOAL_TEMPLATES[goal];
 
