@@ -2,672 +2,116 @@
 
 import { useState } from "react";
 
+type Sex = "male" | "female" | "prefer-not-to-say" | "";
+// TODO: When plan assembly is added, keep an Aesthetics secondary goal modest when Conditioning is primary.
+type Goal = "strength" | "aesthetics" | "weight-loss" | "conditioning" | "athleticism" | "general" | "";
+type Split = "full-body" | "upper-lower" | "push-pull-legs" | "body-part-split" | "athletic-hybrid" | "";
+type Diet = "none" | "vegetarian" | "protein-prioritization" | "carbohydrate-prioritization" | "other" | "";
+
+type SportHistory = { name: string; years: number | null };
+
 interface IntakeData {
+  name: string;
   age: number | null;
+  sex: Sex;
   heightFt: number | null;
   heightIn: number | null;
   weight: number | null;
-  sex: "male" | "female" | "other" | "prefer-not-to-say" | "";
-  highSchoolSports: string[];
+  highSchoolSports: SportHistory[];
   otherSport: string;
   favoriteActivities: string[];
   favoriteActivityOther: string;
-  fitnessGoal: "strength" | "hypertrophy" | "conditioning" | "general" | "";
+  primaryGoal: Goal;
+  primaryAestheticsAreas: string[];
+  secondaryGoal: Goal;
+  secondaryAestheticsAreas: string[];
   daysPerWeek: number | null;
-  trainingSplit: "full-body" | "upper-lower" | "push-pull-legs" | "sport-specific" | "";
+  hoursPerDay: number | null;
+  trainingSplit: Split;
   trainingMethods: string[];
-  dietPreference: "no-restriction" | "vegetarian" | "high-protein" | "other" | "";
+  sportSkillSports: string[];
+  trainingRestrictions: string;
+  dietPlan: Diet;
+  dietPlanOther: string;
+  dietaryRestrictions: string;
 }
 
 const INITIAL_DATA: IntakeData = {
-  age: null,
-  heightFt: null,
-  heightIn: null,
-  weight: null,
-  sex: "",
-  highSchoolSports: [],
-  otherSport: "",
-  favoriteActivities: [],
-  favoriteActivityOther: "",
-  fitnessGoal: "",
-  daysPerWeek: null,
-  trainingSplit: "",
-  trainingMethods: [],
-  dietPreference: "",
+  name: "", age: null, sex: "", heightFt: null, heightIn: null, weight: null,
+  highSchoolSports: [], otherSport: "", favoriteActivities: [], favoriteActivityOther: "",
+  primaryGoal: "", primaryAestheticsAreas: [], secondaryGoal: "", secondaryAestheticsAreas: [],
+  daysPerWeek: null, hoursPerDay: null, trainingSplit: "", trainingMethods: [], sportSkillSports: [],
+  trainingRestrictions: "", dietPlan: "", dietPlanOther: "", dietaryRestrictions: "",
 };
 
-const SPORTS = [
-  "Football",
-  "Basketball",
-  "Baseball",
-  "Soccer",
-  "Track & Field",
-  "Wrestling",
-  "Swimming",
-  "Volleyball",
-  "Tennis",
+const HS_SPORTS = ["Football", "Track & Field", "Cross Country", "Basketball", "Soccer", "Baseball", "Wrestling", "Volleyball", "Softball", "Tennis", "Swim & Dive", "Golf", "Lacrosse", "Gymnastics", "Other"];
+const ACTIVITIES = ["Weightlifting", "Calisthenics", "Plyometrics", "Agility training", "Stability & Mobility training", "Distance Running", "Sprinting", "Swimming", "Combat Sports", "Other"];
+const AESTHETICS = ["Defined shoulders", "Chest", "Back", "Abs", "Legs", "Facial features / jawline"];
+const GOALS: { value: Exclude<Goal, "">; label: string }[] = [
+  { value: "strength", label: "Build strength" }, { value: "aesthetics", label: "Aesthetics" },
+  { value: "weight-loss", label: "Lose weight" }, { value: "conditioning", label: "Conditioning" },
+  { value: "athleticism", label: "Athleticism" }, { value: "general", label: "General" },
 ];
-
-const ACTIVITIES = [
-  "Sprints",
-  "Distance running",
-  "Weightlifting",
-  "Agility drills",
-  "Team practices",
-  "Game-day competition",
-  "Conditioning / circuits",
+const SPLITS: { value: Exclude<Split, "">; label: string }[] = [
+  { value: "full-body", label: "Full body" }, { value: "upper-lower", label: "Upper / Lower" },
+  { value: "push-pull-legs", label: "Push / Pull / Legs" }, { value: "body-part-split", label: "Body part split" },
+  { value: "athletic-hybrid", label: "Athletic Hybrid" },
 ];
-
-const METHODS = [
-  "Strength training",
-  "Cardio / endurance",
-  "Specific sport skill work",
-  "Combat sport",
-  "Mixed / variety",
+const METHODS = ["Free weight training", "Bodyweight training", "Cardio", "Sport-specific skill work", "Hybrid"];
+const DIETS: { value: Exclude<Diet, "">; label: string }[] = [
+  { value: "none", label: "None" }, { value: "vegetarian", label: "Vegetarian" },
+  { value: "protein-prioritization", label: "Protein prioritization" }, { value: "carbohydrate-prioritization", label: "Carbohydrate prioritization" }, { value: "other", label: "Other" },
 ];
-
 const STEPS = [
-  { title: "About You", description: "Basic info" },
-  { title: "HS Sports", description: "Your athletic background" },
-  { title: "Goals", description: "What you're training for" },
-  { title: "Preferences", description: "How you like to train" },
-  { title: "Diet", description: "Fueling your training" },
-  { title: "Review", description: "Confirm your info" },
+  { title: "Biometrics", description: "The basics about you" }, { title: "Athletic History", description: "Your sports and activities" },
+  { title: "Goals", description: "What you want to accomplish" }, { title: "Preferences", description: "How you like to train" },
+  { title: "Diet", description: "How you fuel your training" }, { title: "Review", description: "Check everything before submitting" },
 ];
 
-function toggleArrayItem(arr: string[], item: string): string[] {
-  return arr.includes(item) ? arr.filter((i) => i !== item) : [...arr, item];
-}
+const toggle = (items: string[], item: string) => items.includes(item) ? items.filter((current) => current !== item) : [...items, item];
+const toNumber = (value: string) => value === "" ? null : Number(value);
+const list = (items: string[]) => items.length ? items.join(", ") : "None";
 
 export default function GetStartedPage() {
   const [step, setStep] = useState(0);
   const [data, setData] = useState<IntakeData>(INITIAL_DATA);
-
-  const update = <K extends keyof IntakeData>(field: K, value: IntakeData[K]) =>
-    setData((prev) => ({ ...prev, [field]: value }));
-
-  const isStepValid = (): boolean => {
-    switch (step) {
-      case 0:
-        return (
-          data.age !== null &&
-          data.age > 0 &&
-          (data.heightFt !== null || data.heightIn !== null) &&
-          data.weight !== null &&
-          data.weight > 0 &&
-          data.sex !== ""
-        );
-      case 1:
-        return data.highSchoolSports.length > 0 || data.otherSport.trim() !== "";
-      case 2:
-        return data.fitnessGoal !== "" && data.daysPerWeek !== null && data.daysPerWeek >= 1 && data.daysPerWeek <= 7;
-      case 3:
-        return data.trainingSplit !== "" && data.trainingMethods.length > 0;
-      case 4:
-        return data.dietPreference !== "";
-      default:
-        return true;
-    }
+  const update = <K extends keyof IntakeData>(field: K, value: IntakeData[K]) => setData((previous) => ({ ...previous, [field]: value }));
+  const selectedSport = (name: string) => data.highSchoolSports.find((sport) => sport.name === name);
+  const toggleSport = (name: string) => update("highSchoolSports", selectedSport(name) ? data.highSchoolSports.filter((sport) => sport.name !== name) : [...data.highSchoolSports, { name, years: null }]);
+  const updateYears = (name: string, years: number | null) => update("highSchoolSports", data.highSchoolSports.map((sport) => sport.name === name ? { ...sport, years } : sport));
+  const selectGoal = (field: "primaryGoal" | "secondaryGoal", value: Exclude<Goal, "">) => {
+    update(field, data[field] === value ? "" : value);
+    if (value !== "aesthetics") update(field === "primaryGoal" ? "primaryAestheticsAreas" : "secondaryAestheticsAreas", []);
   };
-
-  const next = () => {
-    if (step < STEPS.length - 1 && isStepValid()) setStep(step + 1);
+  const valid = () => {
+    if (step === 0) return Boolean(data.name.trim() && data.age && data.age > 0 && data.sex && data.heightFt !== null && data.heightIn !== null && data.weight && data.weight > 0);
+    if (step === 1) return Boolean(data.highSchoolSports.length && data.highSchoolSports.every((sport) => sport.years !== null && sport.years >= 1 && sport.years <= 4) && (!selectedSport("Other") || data.otherSport.trim()) && data.favoriteActivities.length && (!data.favoriteActivities.includes("Other") || data.favoriteActivityOther.trim()));
+    if (step === 2) return Boolean(data.primaryGoal && data.daysPerWeek && data.daysPerWeek >= 1 && data.daysPerWeek <= 7 && data.hoursPerDay && data.hoursPerDay >= 0.25 && data.hoursPerDay <= 3);
+    if (step === 3) return Boolean(data.trainingSplit && data.trainingMethods.length);
+    if (step === 4) return Boolean(data.dietPlan && (data.dietPlan !== "other" || data.dietPlanOther.trim()));
+    return true;
   };
-
-  const back = () => {
-    if (step > 0) setStep(step - 1);
-  };
-
-  const handleSubmit = () => {
-    console.log("Intake form data:", data);
-    alert("Form submitted! Check the console for your data.");
-  };
-
-  const labelClass = "block text-sm font-medium mb-1.5";
-  const inputClass =
-    "w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-base outline-none transition-colors focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900/10 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400 dark:focus:ring-zinc-400/10";
-  const radioCardClass = (selected: boolean) =>
-    `flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all ${
-      selected
-        ? "border-zinc-900 bg-zinc-900/5 ring-2 ring-zinc-900/10 dark:border-zinc-400 dark:bg-zinc-400/10 dark:ring-zinc-400/20"
-        : "border-zinc-200 bg-white hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-500"
-    }`;
-  const checkboxClass = (checked: boolean) =>
-    `flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-2.5 text-left transition-all ${
-      checked
-        ? "border-zinc-900 bg-zinc-900/5 ring-2 ring-zinc-900/10 dark:border-zinc-400 dark:bg-zinc-400/10 dark:ring-zinc-400/20"
-        : "border-zinc-200 bg-white hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-500"
-    }`;
+  const next = () => { if (step < STEPS.length - 1 && valid()) setStep(step + 1); };
+  const back = () => { if (step > 0) setStep(step - 1); };
+  const submit = () => { console.log("Intake form data:", data); alert("Form submitted! Check the console for your data."); };
+  const input = "w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-base outline-none transition-colors focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900/10 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400";
+  const label = "block text-sm font-medium mb-1.5";
+  const card = (active: boolean) => `flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all ${active ? "border-zinc-900 bg-zinc-900/5 ring-2 ring-zinc-900/10 dark:border-zinc-400 dark:bg-zinc-400/10" : "border-zinc-200 bg-white hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900"}`;
+  const goalOptions = (field: "primaryGoal" | "secondaryGoal", value: Goal) => <div className="space-y-2">{GOALS.map((goal) => <label key={goal.value} className={card(value === goal.value)}><input type="radio" name={field} checked={value === goal.value} onChange={() => selectGoal(field, goal.value)} className="h-4 w-4 accent-zinc-900" /><span className="text-sm">{goal.label}</span></label>)}</div>;
+  const areas = (field: "primaryAestheticsAreas" | "secondaryAestheticsAreas", show: boolean) => show ? <div className="mt-3 grid grid-cols-1 gap-2 rounded-lg border border-zinc-200 p-3 sm:grid-cols-2 dark:border-zinc-700">{AESTHETICS.map((area) => <label key={area} className={card(data[field].includes(area))}><input type="checkbox" checked={data[field].includes(area)} onChange={() => update(field, toggle(data[field], area))} className="h-4 w-4 accent-zinc-900" /><span className="text-sm">{area}</span></label>)}</div> : null;
 
   const renderStep = () => {
-    switch (step) {
-      case 0:
-        return (
-          <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="age" className={labelClass}>
-                  Age
-                </label>
-                <input
-                  id="age"
-                  type="number"
-                  min={14}
-                  max={100}
-                  placeholder="e.g. 28"
-                  className={inputClass}
-                  value={data.age ?? ""}
-                  onChange={(e) => update("age", e.target.value ? Number(e.target.value) : null)}
-                />
-              </div>
-              <div>
-                <label htmlFor="weight" className={labelClass}>
-                  Weight (lbs)
-                </label>
-                <input
-                  id="weight"
-                  type="number"
-                  min={80}
-                  max={500}
-                  placeholder="e.g. 185"
-                  className={inputClass}
-                  value={data.weight ?? ""}
-                  onChange={(e) => update("weight", e.target.value ? Number(e.target.value) : null)}
-                />
-              </div>
-            </div>
-            <div>
-              <label className={labelClass}>Height</label>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="relative">
-                  <input
-                    id="heightFt"
-                    type="number"
-                    min={3}
-                    max={8}
-                    placeholder="ft"
-                    className={inputClass}
-                    value={data.heightFt ?? ""}
-                    onChange={(e) => update("heightFt", e.target.value ? Number(e.target.value) : null)}
-                  />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">
-                    ft
-                  </span>
-                </div>
-                <div className="relative">
-                  <input
-                    id="heightIn"
-                    type="number"
-                    min={0}
-                    max={11}
-                    placeholder="in"
-                    className={inputClass}
-                    value={data.heightIn ?? ""}
-                    onChange={(e) => update("heightIn", e.target.value ? Number(e.target.value) : null)}
-                  />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">
-                    in
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div>
-              <label htmlFor="sex" className={labelClass}>
-                Sex
-              </label>
-              <select
-                id="sex"
-                className={inputClass}
-                value={data.sex}
-                onChange={(e) => update("sex", e.target.value as IntakeData["sex"])}
-              >
-                <option value="">Select...</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-                <option value="prefer-not-to-say">Prefer not to say</option>
-              </select>
-            </div>
-          </div>
-        );
-
-      case 1:
-        return (
-          <div className="space-y-6">
-            <div>
-              <label className={labelClass}>Which sports did you play in high school?</label>
-              <div className="grid grid-cols-2 gap-2">
-                {SPORTS.map((sport) => {
-                  const checked = data.highSchoolSports.includes(sport);
-                  return (
-                    <label key={sport} className={checkboxClass(checked)}>
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-zinc-300 accent-zinc-900 dark:border-zinc-600 dark:accent-zinc-400"
-                        checked={checked}
-                        onChange={() => update("highSchoolSports", toggleArrayItem(data.highSchoolSports, sport))}
-                      />
-                      <span className="text-sm">{sport}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              <div className="mt-2">
-                <label className={checkboxClass(data.otherSport.trim() !== "")}>
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-zinc-300 accent-zinc-900 dark:border-zinc-600 dark:accent-zinc-400"
-                    checked={data.otherSport.trim() !== ""}
-                    onChange={() => update("otherSport", data.otherSport.trim() !== "" ? "" : "")}
-                  />
-                  <span className="text-sm">Other</span>
-                </label>
-                {data.otherSport.trim() !== "" || true ? (
-                  <input
-                    type="text"
-                    placeholder="Type your sport..."
-                    className={`${inputClass} mt-2`}
-                    value={data.otherSport}
-                    onChange={(e) => update("otherSport", e.target.value)}
-                  />
-                ) : null}
-              </div>
-            </div>
-            <div>
-              <label className={labelClass}>Favorite athletic activities</label>
-              <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
-                What did you enjoy most?
-              </p>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {ACTIVITIES.map((activity) => {
-                  const checked = data.favoriteActivities.includes(activity);
-                  return (
-                    <label key={activity} className={checkboxClass(checked)}>
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-zinc-300 accent-zinc-900 dark:border-zinc-600 dark:accent-zinc-400"
-                        checked={checked}
-                        onChange={() =>
-                          update("favoriteActivities", toggleArrayItem(data.favoriteActivities, activity))
-                        }
-                      />
-                      <span className="text-sm">{activity}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              <div className="mt-2">
-                <label className={checkboxClass(data.favoriteActivityOther.trim() !== "")}>
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-zinc-300 accent-zinc-900 dark:border-zinc-600 dark:accent-zinc-400"
-                    checked={data.favoriteActivityOther.trim() !== ""}
-                    onChange={() =>
-                      update("favoriteActivityOther", data.favoriteActivityOther.trim() !== "" ? "" : "")
-                    }
-                  />
-                  <span className="text-sm">Other</span>
-                </label>
-                {data.favoriteActivityOther.trim() !== "" || true ? (
-                  <input
-                    type="text"
-                    placeholder="Describe what you enjoyed..."
-                    className={`${inputClass} mt-2`}
-                    value={data.favoriteActivityOther}
-                    onChange={(e) => update("favoriteActivityOther", e.target.value)}
-                  />
-                ) : null}
-              </div>
-            </div>
-          </div>
-        );
-
-      case 2:
-        return (
-          <div className="space-y-6">
-            <div>
-              <label className={labelClass}>What&apos;s your main fitness goal?</label>
-              <div className="space-y-2">
-                {(
-                  [
-                    ["strength", "Strength", "Get stronger — focus on lifting heavier numbers"],
-                    ["hypertrophy", "Hypertrophy", "Build muscle size and definition"],
-                    ["conditioning", "Conditioning", "Improve endurance, stamina, and work capacity"],
-                    ["general", 'General "Get Back in Shape"', "Just want to feel athletic again — a mix of everything"],
-                  ] as const
-                ).map(([value, label, desc]) => (
-                  <label key={value} className={radioCardClass(data.fitnessGoal === value)}>
-                    <input
-                      type="radio"
-                      name="fitnessGoal"
-                      className="h-4 w-4 border-zinc-300 accent-zinc-900 dark:border-zinc-600 dark:accent-zinc-400"
-                      checked={data.fitnessGoal === value}
-                      onChange={() => update("fitnessGoal", value)}
-                    />
-                    <div>
-                      <div className="text-sm font-medium">{label}</div>
-                      <div className="text-xs text-zinc-500 dark:text-zinc-400">{desc}</div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label htmlFor="daysPerWeek" className={labelClass}>
-                Days per week available to train
-              </label>
-              <input
-                id="daysPerWeek"
-                type="number"
-                min={1}
-                max={7}
-                placeholder="e.g. 4"
-                className={inputClass}
-                value={data.daysPerWeek ?? ""}
-                onChange={(e) => update("daysPerWeek", e.target.value ? Number(e.target.value) : null)}
-              />
-            </div>
-          </div>
-        );
-
-      case 3:
-        return (
-          <div className="space-y-6">
-            <div>
-              <label className={labelClass}>Preferred training split</label>
-              <div className="space-y-2">
-                {(
-                  [
-                    ["full-body", "Full Body", "Hit all muscle groups each session"],
-                    ["upper-lower", "Upper / Lower", "Alternate upper and lower body days"],
-                    ["push-pull-legs", "Push / Pull / Legs", "Three-day rotation by movement pattern"],
-                    ["sport-specific", "Sport-Specific Hybrid", "Mix of general strength and sport skill work"],
-                  ] as const
-                ).map(([value, label, desc]) => (
-                  <label key={value} className={radioCardClass(data.trainingSplit === value)}>
-                    <input
-                      type="radio"
-                      name="trainingSplit"
-                      className="h-4 w-4 border-zinc-300 accent-zinc-900 dark:border-zinc-600 dark:accent-zinc-400"
-                      checked={data.trainingSplit === value}
-                      onChange={() => update("trainingSplit", value)}
-                    />
-                    <div>
-                      <div className="text-sm font-medium">{label}</div>
-                      <div className="text-xs text-zinc-500 dark:text-zinc-400">{desc}</div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className={labelClass}>Preferred training methods</label>
-              <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">Select all that apply</p>
-              <div className="space-y-2">
-                {METHODS.map((method) => {
-                  const checked = data.trainingMethods.includes(method);
-                  return (
-                    <label key={method} className={checkboxClass(checked)}>
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-zinc-300 accent-zinc-900 dark:border-zinc-600 dark:accent-zinc-400"
-                        checked={checked}
-                        onChange={() =>
-                          update("trainingMethods", toggleArrayItem(data.trainingMethods, method))
-                        }
-                      />
-                      <span className="text-sm">{method}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        );
-
-      case 4:
-        return (
-          <div className="space-y-2">
-            <label className={labelClass}>Diet preference</label>
-            {(
-              [
-                ["no-restriction", "No Restriction", "I eat everything"],
-                ["vegetarian", "Vegetarian", "No meat, but I eat dairy/eggs"],
-                ["high-protein", "High-Protein Focus", "Prioritize protein intake in my meals"],
-                ["other", "Other", "Custom diet approach"],
-              ] as const
-            ).map(([value, label, desc]) => (
-              <label key={value} className={radioCardClass(data.dietPreference === value)}>
-                <input
-                  type="radio"
-                  name="dietPreference"
-                  className="h-4 w-4 border-zinc-300 accent-zinc-900 dark:border-zinc-600 dark:accent-zinc-400"
-                  checked={data.dietPreference === value}
-                  onChange={() => update("dietPreference", value)}
-                />
-                <div>
-                  <div className="text-sm font-medium">{label}</div>
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400">{desc}</div>
-                </div>
-              </label>
-            ))}
-          </div>
-        );
-
-      case 5:
-        return (
-          <div className="space-y-5">
-            <ReviewSection
-              title="About You"
-              onEdit={() => setStep(0)}
-              items={[
-                { label: "Age", value: data.age !== null ? `${data.age} years old` : "—" },
-                {
-                  label: "Height",
-                  value:
-                    data.heightFt !== null || data.heightIn !== null
-                      ? `${data.heightFt ?? 0}'${data.heightIn ?? 0}"`
-                      : "—",
-                },
-                { label: "Weight", value: data.weight !== null ? `${data.weight} lbs` : "—" },
-                {
-                  label: "Sex",
-                  value: data.sex
-                    ? data.sex.charAt(0).toUpperCase() + data.sex.slice(1).replace(/-/g, " ")
-                    : "—",
-                },
-              ]}
-            />
-            <ReviewSection
-              title="High School Experience"
-              onEdit={() => setStep(1)}
-              items={[
-                {
-                  label: "Sports",
-                  value:
-                    data.highSchoolSports.length > 0 || data.otherSport
-                      ? [...data.highSchoolSports, data.otherSport].filter(Boolean).join(", ")
-                      : "—",
-                },
-                {
-                  label: "Favorite activities",
-                  value:
-                    data.favoriteActivities.length > 0 || data.favoriteActivityOther
-                      ? [...data.favoriteActivities, data.favoriteActivityOther].filter(Boolean).join(", ")
-                      : "—",
-                },
-              ]}
-            />
-            <ReviewSection
-              title="Training Goals"
-              onEdit={() => setStep(2)}
-              items={[
-                {
-                  label: "Goal",
-                  value: data.fitnessGoal
-                    ? data.fitnessGoal.charAt(0).toUpperCase() + data.fitnessGoal.slice(1).replace(/-/g, " ")
-                    : "—",
-                },
-                { label: "Days per week", value: data.daysPerWeek !== null ? `${data.daysPerWeek}` : "—" },
-              ]}
-            />
-            <ReviewSection
-              title="Training Preferences"
-              onEdit={() => setStep(3)}
-              items={[
-                {
-                  label: "Split",
-                  value: data.trainingSplit
-                    ? data.trainingSplit
-                        .split("-")
-                        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                        .join("-")
-                    : "—",
-                },
-                {
-                  label: "Methods",
-                  value: data.trainingMethods.length > 0 ? data.trainingMethods.join(", ") : "—",
-                },
-              ]}
-            />
-            <ReviewSection
-              title="Diet"
-              onEdit={() => setStep(4)}
-              items={[
-                {
-                  label: "Preference",
-                  value: data.dietPreference
-                    ? data.dietPreference
-                        .split("-")
-                        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                        .join(" ")
-                    : "—",
-                },
-              ]}
-            />
-          </div>
-        );
-    }
+    if (step === 0) return <div className="space-y-5"><div><label htmlFor="name" className={label}>Name</label><input id="name" type="text" className={input} value={data.name} onChange={(event) => update("name", event.target.value)} /></div><div className="grid grid-cols-2 gap-4"><div><label htmlFor="age" className={label}>Age</label><input id="age" type="number" min={1} className={input} value={data.age ?? ""} onChange={(event) => update("age", toNumber(event.target.value))} /></div><div><label htmlFor="weight" className={label}>Weight (lbs)</label><input id="weight" type="number" min={1} className={input} value={data.weight ?? ""} onChange={(event) => update("weight", toNumber(event.target.value))} /></div></div><div><label htmlFor="sex" className={label}>Sex</label><select id="sex" className={input} value={data.sex} onChange={(event) => update("sex", event.target.value as Sex)}><option value="">Select...</option><option value="male">Male</option><option value="female">Female</option><option value="prefer-not-to-say">Prefer not to say</option></select></div><div><label className={label}>Height</label><div className="grid grid-cols-2 gap-3"><input aria-label="Height in feet" type="number" min={0} max={8} placeholder="Feet" className={input} value={data.heightFt ?? ""} onChange={(event) => update("heightFt", toNumber(event.target.value))} /><input aria-label="Height in inches" type="number" min={0} max={11} placeholder="Inches" className={input} value={data.heightIn ?? ""} onChange={(event) => update("heightIn", toNumber(event.target.value))} /></div></div></div>;
+    if (step === 1) return <div className="space-y-8"><section><h3 className="mb-1 text-base font-semibold">Part I: High-school sports</h3><p className="mb-3 text-sm text-zinc-500">Select each sport and enter the years played.</p><div className="space-y-2">{HS_SPORTS.map((sport) => { const record = selectedSport(sport); return <div key={sport} className={`rounded-lg border p-3 ${record ? "border-zinc-900 dark:border-zinc-400" : "border-zinc-200 dark:border-zinc-700"}`}><label className="flex cursor-pointer items-center gap-3"><input type="checkbox" checked={Boolean(record)} onChange={() => toggleSport(sport)} className="h-4 w-4 accent-zinc-900" /><span className="text-sm">{sport}</span></label>{record ? <div className="mt-3 flex items-center gap-2 pl-7"><label htmlFor={`years-${sport}`} className="text-xs text-zinc-500">Years played</label><input id={`years-${sport}`} type="number" min={1} max={4} step={1} className="w-24 rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm" value={record.years ?? ""} onChange={(event) => updateYears(sport, toNumber(event.target.value))} /></div> : null}</div>; })}</div>{selectedSport("Other") ? <input type="text" placeholder="Other sport" className={`${input} mt-3`} value={data.otherSport} onChange={(event) => update("otherSport", event.target.value)} /> : null}</section><section><h3 className="mb-1 text-base font-semibold">Part II: Favorite athletic activities</h3><p className="mb-3 text-sm text-zinc-500">Select all that sound like you.</p><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{ACTIVITIES.map((activity) => <label key={activity} className={card(data.favoriteActivities.includes(activity))}><input type="checkbox" checked={data.favoriteActivities.includes(activity)} onChange={() => update("favoriteActivities", toggle(data.favoriteActivities, activity))} className="h-4 w-4 accent-zinc-900" /><span className="text-sm">{activity}</span></label>)}</div>{data.favoriteActivities.includes("Other") ? <input type="text" placeholder="Other activity" className={`${input} mt-3`} value={data.favoriteActivityOther} onChange={(event) => update("favoriteActivityOther", event.target.value)} /> : null}</section></div>;
+    if (step === 2) return <div className="space-y-8"><section><h3 className="mb-1 text-base font-semibold">Part I: Primary goal</h3><p className="mb-3 text-sm text-zinc-500">Choose one primary goal.</p>{goalOptions("primaryGoal", data.primaryGoal)}{areas("primaryAestheticsAreas", data.primaryGoal === "aesthetics")}</section><section><h3 className="mb-1 text-base font-semibold">Optional secondary goal</h3><p className="mb-3 text-sm text-zinc-500">This will be lower priority than your primary goal.</p>{goalOptions("secondaryGoal", data.secondaryGoal)}{areas("secondaryAestheticsAreas", data.secondaryGoal === "aesthetics")}</section><section><h3 className="mb-3 text-base font-semibold">Part II: Time available</h3><div className="grid grid-cols-2 gap-4"><div><label htmlFor="days" className={label}>Days per week</label><input id="days" type="number" min={1} max={7} step={1} className={input} value={data.daysPerWeek ?? ""} onChange={(event) => update("daysPerWeek", toNumber(event.target.value))} /></div><div><label htmlFor="hours" className={label}>Hours per day</label><input id="hours" type="number" min={0.25} max={3} step={0.25} className={input} value={data.hoursPerDay ?? ""} onChange={(event) => update("hoursPerDay", toNumber(event.target.value))} /></div></div></section></div>;
+    if (step === 3) return <div className="space-y-8"><section><h3 className="mb-3 text-base font-semibold">Part I: Training preferences</h3><label className={label}>Preferred training split</label><div className="space-y-2">{SPLITS.map((split) => <label key={split.value} className={card(data.trainingSplit === split.value)}><input type="radio" name="split" checked={data.trainingSplit === split.value} onChange={() => update("trainingSplit", split.value)} className="h-4 w-4 accent-zinc-900" /><span className="text-sm">{split.label}</span></label>)}</div><label className={`${label} mt-6`}>Preferred training methods</label><div className="space-y-2">{METHODS.map((method) => <label key={method} className={card(data.trainingMethods.includes(method))}><input type="checkbox" checked={data.trainingMethods.includes(method)} onChange={() => update("trainingMethods", toggle(data.trainingMethods, method))} className="h-4 w-4 accent-zinc-900" /><span className="text-sm">{method}</span></label>)}</div>{data.trainingMethods.includes("Sport-specific skill work") ? <div className="mt-3"><label htmlFor="skillSports" className={label}>Sports for skill work (up to 2)</label><input id="skillSports" type="text" className={input} placeholder="e.g. Soccer, basketball" value={data.sportSkillSports.join(", ")} onChange={(event) => update("sportSkillSports", event.target.value.split(",").map((sport) => sport.trim()).filter(Boolean).slice(0, 2))} /></div> : null}</section><section><h3 className="mb-1 text-base font-semibold">Part II: Training restrictions</h3><p className="mb-3 text-sm text-zinc-500">Include injuries, equipment limits, exercises to avoid, or anything else we should know.</p><textarea className={`${input} min-h-32 resize-y`} value={data.trainingRestrictions} onChange={(event) => update("trainingRestrictions", event.target.value)} /></section></div>;
+    if (step === 4) return <div className="space-y-8"><section><h3 className="mb-3 text-base font-semibold">Part I: Preferred diet plan</h3><div className="space-y-2">{DIETS.map((diet) => <label key={diet.value} className={card(data.dietPlan === diet.value)}><input type="radio" name="diet" checked={data.dietPlan === diet.value} onChange={() => update("dietPlan", diet.value)} className="h-4 w-4 accent-zinc-900" /><span className="text-sm">{diet.label}</span></label>)}</div>{data.dietPlan === "other" ? <input type="text" placeholder="Describe your preferred diet plan" className={`${input} mt-3`} value={data.dietPlanOther} onChange={(event) => update("dietPlanOther", event.target.value)} /> : null}</section><section><h3 className="mb-1 text-base font-semibold">Part II: Dietary restrictions</h3><p className="mb-3 text-sm text-zinc-500">List allergies, intolerances, or other dietary restrictions.</p><textarea className={`${input} min-h-32 resize-y`} value={data.dietaryRestrictions} onChange={(event) => update("dietaryRestrictions", event.target.value)} /></section></div>;
+    return <div className="space-y-4"><Review title="Biometrics" edit={() => setStep(0)} items={[["Name", data.name], ["Age", `${data.age ?? "—"}`], ["Sex", data.sex || "—"], ["Height", data.heightFt === null || data.heightIn === null ? "—" : `${data.heightFt}'${data.heightIn}"`], ["Weight", data.weight === null ? "—" : `${data.weight} lbs`]]} /><Review title="Athletic History" edit={() => setStep(1)} items={[["HS sports", data.highSchoolSports.map((sport) => `${sport.name === "Other" ? data.otherSport || "Other" : sport.name} (${sport.years ?? "?"} yr)`).join(", ") || "None"], ["Favorite activities", data.favoriteActivities.map((activity) => activity === "Other" ? data.favoriteActivityOther || "Other" : activity).join(", ") || "None"]]} /><Review title="Goals" edit={() => setStep(2)} items={[["Primary", GOALS.find((goal) => goal.value === data.primaryGoal)?.label || "—"], ["Primary aesthetics", list(data.primaryAestheticsAreas)], ["Secondary", GOALS.find((goal) => goal.value === data.secondaryGoal)?.label || "None"], ["Secondary aesthetics", list(data.secondaryAestheticsAreas)], ["Availability", `${data.daysPerWeek ?? "—"} days / ${data.hoursPerDay ?? "—"} hours`]]} /><Review title="Preferences" edit={() => setStep(3)} items={[["Split", SPLITS.find((split) => split.value === data.trainingSplit)?.label || "—"], ["Methods", list(data.trainingMethods)], ["Skill sports", list(data.sportSkillSports)], ["Restrictions", data.trainingRestrictions || "None"]]} /><Review title="Diet" edit={() => setStep(4)} items={[["Plan", DIETS.find((diet) => diet.value === data.dietPlan)?.label || "—"], ["Other plan", data.dietPlanOther || "None"], ["Restrictions / allergies", data.dietaryRestrictions || "None"]]} /></div>;
   };
 
-  return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 py-8 sm:px-6">
-        <div className="mb-2 text-center">
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Let&apos;s Get You Started
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Tell us about your background so we can build your plan.
-          </p>
-        </div>
-
-        {/* Progress indicator */}
-        <div className="mb-8 mt-6">
-          <div className="flex items-center justify-between">
-            {STEPS.map((s, i) => (
-              <div key={i} className="flex flex-1 items-center">
-                <div className="flex flex-col items-center">
-                  <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
-                      i < step
-                        ? "bg-zinc-900 text-white dark:bg-zinc-400 dark:text-zinc-900"
-                        : i === step
-                          ? "bg-zinc-900 text-white ring-2 ring-zinc-900/20 ring-offset-2 dark:bg-zinc-400 dark:text-zinc-900 dark:ring-zinc-400/30"
-                          : "bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
-                    }`}
-                  >
-                    {i < step ? "✓" : i + 1}
-                  </div>
-                  <span className="mt-1 hidden text-[10px] font-medium text-zinc-500 dark:text-zinc-400 sm:block">
-                    {s.title}
-                  </span>
-                </div>
-                {i < STEPS.length - 1 && (
-                  <div
-                    className={`mx-1 h-0.5 flex-1 transition-colors ${
-                      i < step ? "bg-zinc-900 dark:bg-zinc-400" : "bg-zinc-200 dark:bg-zinc-800"
-                    }`}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Step content */}
-        <div className="flex-1">
-          <h2 className="mb-1 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            {STEPS[step].title}
-          </h2>
-          <p className="mb-5 text-sm text-zinc-500 dark:text-zinc-400">{STEPS[step].description}</p>
-          {renderStep()}
-        </div>
-
-        {/* Navigation */}
-        <div className="mt-8 flex gap-3 border-t border-zinc-200 pt-5 dark:border-zinc-800">
-          {step > 0 && (
-            <button
-              type="button"
-              onClick={back}
-              className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              Back
-            </button>
-          )}
-          {step < STEPS.length - 1 ? (
-            <button
-              type="button"
-              onClick={next}
-              disabled={!isStepValid()}
-              className="flex-1 rounded-lg bg-zinc-900 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white dark:disabled:opacity-30"
-            >
-              Next
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSubmit}
-              className="flex-1 rounded-lg bg-zinc-900 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
-            >
-              Submit
-            </button>
-          )}
-        </div>
-      </main>
-    </div>
-  );
+  return <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black"><main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 py-8 sm:px-6"><div className="mb-2 text-center"><h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Let&apos;s Get You Started</h1><p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Tell us about your background so we can build your plan.</p></div><div className="mb-8 mt-6"><div className="flex items-center justify-between">{STEPS.map((current, index) => <div key={current.title} className="flex flex-1 items-center"><button type="button" onClick={() => index <= step && setStep(index)} className="flex flex-col items-center" aria-label={`Go to ${current.title}`}><span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${index < step ? "bg-zinc-900 text-white" : index === step ? "bg-zinc-900 text-white ring-2 ring-zinc-900/20 ring-offset-2" : "bg-zinc-200 text-zinc-500"}`}>{index < step ? "✓" : index + 1}</span><span className="mt-1 hidden text-[10px] font-medium text-zinc-500 sm:block">{current.title}</span></button>{index < STEPS.length - 1 ? <div className={`mx-1 h-0.5 flex-1 ${index < step ? "bg-zinc-900" : "bg-zinc-200"}`} /> : null}</div>)}</div></div><div className="flex-1"><h2 className="mb-1 text-lg font-semibold text-zinc-900 dark:text-zinc-50">{STEPS[step].title}</h2><p className="mb-5 text-sm text-zinc-500 dark:text-zinc-400">{STEPS[step].description}</p>{renderStep()}</div><div className="mt-8 flex gap-3 border-t border-zinc-200 pt-5 dark:border-zinc-800">{step > 0 ? <button type="button" onClick={back} className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-medium text-zinc-700">Back</button> : null}{step < STEPS.length - 1 ? <button type="button" onClick={next} disabled={!valid()} className="flex-1 rounded-lg bg-zinc-900 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">Next</button> : <button type="button" onClick={submit} className="flex-1 rounded-lg bg-zinc-900 px-4 py-3 text-sm font-medium text-white">Submit</button>}</div></main></div>;
 }
 
-function ReviewSection({
-  title,
-  onEdit,
-  items,
-}: {
-  title: string;
-  onEdit: () => void;
-  items: { label: string; value: string }[];
-}) {
-  return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{title}</h3>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-        >
-          Edit
-        </button>
-      </div>
-      <dl className="space-y-1">
-        {items.map((item) => (
-          <div key={item.label} className="flex justify-between text-sm">
-            <dt className="text-zinc-500 dark:text-zinc-400">{item.label}</dt>
-            <dd className="font-medium text-zinc-900 dark:text-zinc-100">{item.value}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
+function Review({ title, edit, items }: { title: string; edit: () => void; items: [string, string][] }) {
+  return <section className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"><div className="mb-2 flex items-center justify-between"><h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{title}</h3><button type="button" onClick={edit} className="text-xs font-medium text-zinc-500 hover:text-zinc-900">Edit</button></div><dl className="space-y-1">{items.map(([key, value]) => <div key={key} className="flex justify-between gap-4 text-sm"><dt className="text-zinc-500">{key}</dt><dd className="text-right font-medium text-zinc-900 dark:text-zinc-100">{value}</dd></div>)}</dl></section>;
 }
