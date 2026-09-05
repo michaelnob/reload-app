@@ -35,14 +35,7 @@ export interface Plan {
   days: Day[];
 }
 
-const slotCategories = [
-  "compound",
-  "accessory",
-  "core",
-  "conditioning",
-] as const;
-
-type SlotCategory = (typeof slotCategories)[number];
+export type SlotCategory = "compound" | "accessory" | "core" | "conditioning";
 
 interface GoalTemplate {
   key: GoalKey;

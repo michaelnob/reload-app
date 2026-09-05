@@ -326,7 +326,7 @@ export default function GetStartedPage() {
         return (
           <div className="space-y-6">
             <div>
-              <label className={labelClass}>What's your main fitness goal?</label>
+              <label className={labelClass}>What&apos;s your main fitness goal?</label>
               <div className="space-y-2">
                 {(
                   [
