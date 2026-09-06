@@ -1,4 +1,11 @@
 import type { IntakeData } from "@/types/intake";
+import { exerciseLibrary } from "@/lib/exerciseLibrary";
+import {
+  getGlobalExperienceNote,
+  getGlobalExperienceTier,
+  getSkillNoteOverride,
+  SPORT_TAG_TO_HIGH_SCHOOL_SPORT,
+} from "@/lib/experienceModifier";
 
 export type GoalKey = "strength" | "hypertrophy" | "conditioning" | "general";
 
@@ -35,6 +42,7 @@ export interface Plan {
   daysPerWeek: number;
   split: SplitKey;
   days: Day[];
+  experienceNote?: string;
 }
 
 export type SlotCategory = "compound" | "accessory" | "core" | "conditioning";
@@ -196,6 +204,48 @@ function dayFromBlocks(index: number, focus: string, blocks: Block[]): Day {
     focus,
     blocks,
   };
+}
+
+function addSkillExperienceNotes(days: Day[], intake: IntakeData, globalTier: ReturnType<typeof getGlobalExperienceTier>): Day[] {
+  if (!globalTier) {
+    return days;
+  }
+
+  return days.map((day) => ({
+    ...day,
+    blocks: day.blocks.map((block) => {
+      if (block.kind !== "skill") {
+        return block;
+      }
+
+      const sourceExercise = exerciseLibrary.find(
+        (exercise) => exercise.blockKind === "skill" && exercise.name === block.name
+      );
+      const sportTag = sourceExercise?.sportTags?.find(
+        (tag) => SPORT_TAG_TO_HIGH_SCHOOL_SPORT[tag]
+      );
+      const matchingSport = sportTag
+        ? intake.highSchoolSports.find(
+            (sport) => sport.name === SPORT_TAG_TO_HIGH_SCHOOL_SPORT[sportTag]
+          )
+        : undefined;
+
+      if (!matchingSport) {
+        return block;
+      }
+
+      const specificTier = getGlobalExperienceTier([matchingSport]);
+      if (!specificTier || specificTier === globalTier) {
+        return block;
+      }
+
+      const override = getSkillNoteOverride(specificTier);
+      return {
+        ...block,
+        notes: block.notes ? `${block.notes}\n${override}` : override,
+      };
+    }),
+  }));
 }
 
 function planFullBody(days: number, template: GoalTemplate, intake: IntakeData): Day[] {
@@ -372,11 +422,15 @@ export function generatePlan(intake: IntakeData): Plan {
     });
   }
 
+  const globalTier = getGlobalExperienceTier(intake.highSchoolSports);
+  daysOut = addSkillExperienceNotes(daysOut, intake, globalTier);
+
   return {
     goal,
     goalLabel: template.label,
     daysPerWeek: days,
     split,
     days: daysOut,
+    ...(globalTier ? { experienceNote: getGlobalExperienceNote(globalTier) } : {}),
   };
 }
